@@ -17,8 +17,6 @@ Download BACnet Stack Libaries:
   tags:
     - docker
   image: alpine:latest
-  only:
-    - pushes
   variables:
     GIT_SUBMODULE_STRATEGY: none
   script:
