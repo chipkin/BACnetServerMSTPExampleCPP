@@ -27,10 +27,10 @@
     <ClCompile Include="CHiTimer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Serial.cpp">
+    <ClCompile Include="..\submodules\cas-bacnet-stack\source\MSTP.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\submodules\cas-bacnet-stack\source\MSTP.c">
+    <ClCompile Include="..\submodules\serial\rs232.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -50,10 +50,10 @@
     <ClInclude Include="CHiTimer.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="Serial.h">
+    <ClInclude Include="..\submodules\cas-bacnet-stack\source\MSTP.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\submodules\cas-bacnet-stack\source\MSTP.h">
+    <ClInclude Include="..\submodules\serial\rs232.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -9,7 +9,7 @@
 // MSTP
 #include "MSTP.h"
 #include "CHiTimer.h"
-#include "Serial.h"
+#include "rs232.h"
 
 // Helpers 
 #include "ChipkinEndianness.h"
@@ -23,12 +23,19 @@
 #ifndef __GNUC__ // Windows
 	#include <windows.h> // Sleep 
 #endif 
-
+/*
+#ifdef __GNUC__
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+void Sleep(int milliseconds) {
+	usleep(milliseconds * 1000 );
+}
+#endif //
+*/
 // Globals
 // =======================================
 ExampleDatabase g_database; // The example database that stores current values.
-CHiTimer g_timer; 
-CSerial g_serial;
 
 // Constants
 // =======================================
@@ -37,11 +44,11 @@ const uint32_t MAX_XML_RENDER_BUFFER_LENGTH = 1024 * 20;
 
 // MSTP callbacks 
 bool RecvByte(unsigned char* byte);
-bool SendByte(unsigned char* byte, UINT length);
+bool SendByte(unsigned char* byte, uint32_t length);
 void ThreadSleep(uint32_t length);
 void TimerReset();
 uint32_t TimerDifference();
-void APDUCallBack(unsigned char* buffer, UINT length, unsigned char source);
+void APDUCallBack(unsigned char* buffer, uint32_t length, unsigned char source);
 
 struct MSTPAPDUFrame : public MSTPFrame
 {
@@ -71,11 +78,30 @@ time_t CallbackGetSystemTime();
 bool CallbackGetPropertyCharString(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, char* value, uint32_t* valueElementCount, const uint32_t maxElementCount, uint8_t* encodingType, const bool useArrayIndex, const uint32_t propertyArrayIndex);
 bool CallbackGetPropertyUInt(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, uint32_t* value, const bool useArrayIndex, const uint32_t propertyArrayIndex);
 
-int main()
+int main(int argc, char* argv[])
 {
 	// Print the application version information 
 	std::cout << "CAS BACnet Stack Server MSTP Example v" << APPLICATION_VERSION << "." << CIBUILDNUMBER << std::endl; 
-	std::cout << "https://github.com/chipkin/BACnetServerMSTPExampleCPP" << std::endl << std::endl;
+	std::cout << "https://github.com/chipkin/BACnetServerMSTPExampleCPP" << std::endl;
+	std::cout << "MSTP [serial port] [baud rate] [mac address]" << std::endl << std::endl;
+
+	// Check the command line arguments 
+	if (argc >= 2) {
+		int32_t port = RS232_GetPortnr(argv[1]);
+		if (port < 0) {
+			std::cerr << "Could not detect port number from string. port=[" << argv[2] << "]... Accepted string COM4, ttyS4, etc... " << std::endl;
+			return 0; 
+		}
+		g_database.device.serialPort = port; 
+		std::cout << "FYI: Using comport=[" << argv[1] << "], Portnr=[" << (int) g_database.device.serialPort << "]" << std::endl ;
+	}
+	if (argc >= 3) {
+		g_database.device.baudRate = atoi(argv[2]);
+	}
+	if (argc >= 4) {
+		g_database.device.macAddress = atoi(argv[3]);
+		std::cout << "FYI: Using macAddress=[" << (int) g_database.device.macAddress << "]" << std::endl;
+	}
 
 	// 1. Load the CAS BACnet stack functions
 	// ---------------------------------------------------------------------------
@@ -89,15 +115,17 @@ int main()
 
 	// 2. Connect the serial resource
 	// ---------------------------------------------------------------------------
-	std::cout << "FYI: Connecting serial resource to comport=[" << g_database.device.serialPort << "], baudrate=[" << g_database.device.baudRate << "], ... ";
-	if (!g_serial.Open(g_database.device.serialPort, g_database.device.baudRate, 'n', 8, 1)) {
+	std::cout << "FYI: Connecting serial resource to serial port. baudrate=[" << g_database.device.baudRate << "], ... ";
+
+	if (RS232_OpenComport(g_database.device.serialPort, g_database.device.baudRate, "8N1", 0) == 1) {
 		std::cerr << "Error: Failed to open serial port" << std::endl;
 		return 0;
 	}
 	std::cout << "OK" << std::endl;
 
 	// Configure the highspeed timer. 
-	g_timer.Reset(); 
+	CHiTimer_Init();
+	// g_timer.Reset(); 
 
 	// Configure the MSTP thread 
 	if (!MSTP_Init(RecvByte, SendByte, ThreadSleep, APDUCallBack, TimerReset, TimerDifference, g_database.device.macAddress, NULL)) {
@@ -153,7 +181,7 @@ int main()
 
 	// 5. Start the main loop
 	// ---------------------------------------------------------------------------
-	std::cout << "FYI: Entering main loop..." << std::endl ;
+	std::cout << "FYI: Entering main loop..." << std::endl << std::flush;
 	for (;;) {
 		MSTP_Loop();
 
@@ -162,13 +190,6 @@ int main()
 
 		// Update values in the example database
 		g_database.Loop();
-
-		// Call Sleep to give some time back to the system
-		#ifdef _WIN32
-			Sleep(0); // Windows 
-		#else
-			sleep(0); // Linux 
-		#endif
 	}
 
 	// All done. 
@@ -190,6 +211,8 @@ uint16_t CallbackReceiveMessage(uint8_t* message, const uint16_t maxMessageLengt
 	}
 
 	if (g_incomingFrame.size() <= 0) {
+		// Call Sleep to give some time back to the system
+		// Sleep(1);
 		return 0; // Nothing recived. 
 	}
 
@@ -208,13 +231,6 @@ uint16_t CallbackReceiveMessage(uint8_t* message, const uint16_t maxMessageLengt
 
 		// Done with this frame. 
 		g_incomingFrame.erase(itr);
-
-		// Process the message as XML
-		static char xmlRenderBuffer[MAX_XML_RENDER_BUFFER_LENGTH];
-		if (fpDecodeAsXML((char*)message, bytesRead, xmlRenderBuffer, MAX_XML_RENDER_BUFFER_LENGTH) > 0) {
-			std::cout << xmlRenderBuffer << std::endl;
-			memset(xmlRenderBuffer, 0, MAX_XML_RENDER_BUFFER_LENGTH);
-		}
 
 		// Done 
 		return bytesRead;
@@ -244,14 +260,7 @@ uint16_t CallbackSendMessage(const uint8_t* message, const uint16_t messageLengt
 		std::cerr << "Error: Could not send message to MSTP stack" << std::endl;
 		return 0; // Could not send message 
 	}
-
-	// Get the XML rendered version of the just sent message
-	static char xmlRenderBuffer[MAX_XML_RENDER_BUFFER_LENGTH];
-	if (fpDecodeAsXML((char*)message, messageLength, xmlRenderBuffer, MAX_XML_RENDER_BUFFER_LENGTH) > 0) {
-		std::cout << xmlRenderBuffer << std::endl;
-		memset(xmlRenderBuffer, 0, MAX_XML_RENDER_BUFFER_LENGTH);
-	}
-
+	
 	// Everything looks good. 
 	return messageLength;
 }
@@ -305,7 +314,7 @@ bool CallbackGetPropertyUInt(uint32_t deviceInstance, uint16_t objectType, uint3
 //   True - Found a byte and stored the value in byte prameter. 
 //   False - No bytes avaliable. 
 bool RecvByte(unsigned char* byte) {
-	if (g_serial.ReadData(byte, 1) <= 0) {
+	if (RS232_PollComport(g_database.device.serialPort, byte, 1) <= 0) {
 		// no bytes found 
 		return false;
 	}
@@ -321,7 +330,7 @@ bool RecvByte(unsigned char* byte) {
 // Return
 //   True  - The bytes where succesfuly sent. 
 //   False - Could not send the bytes. Try again later. 
-bool SendByte(unsigned char* byte, UINT length) {
+bool SendByte(unsigned char* byte, uint32_t length) {
 
 	std::cout << "+";
 	/*
@@ -332,8 +341,7 @@ bool SendByte(unsigned char* byte, UINT length) {
 	}
 	std::cout << std::endl; 
 	*/
-
-	if (g_serial.SendData( (char *)byte, length) != length) {
+	if (RS232_SendBuf(g_database.device.serialPort, byte, length) != length) {
 		// Bytes could not be sent 
 		return false;
 	}
@@ -342,14 +350,7 @@ bool SendByte(unsigned char* byte, UINT length) {
 }
 
 
-#ifdef __GNUC__
-#include <termios.h>
-#include <unistd.h>
-#include <fcntl.h>
-void Sleep(int milliseconds) {
-	sleep(milliseconds);
-}
-#endif //
+
 
 // The MSTP thread does not need attention for the next "length" amount of time. 
 // This function can do nothing, and the MSTP thread will consumed as much proccessing power 
@@ -358,21 +359,21 @@ void ThreadSleep(uint32_t length) {
 	if (length < 1) {
 		return;
 	}
-	Sleep((DWORD)length);
+	// Sleep(length);
 }
 
 // Reset the high speed timer back to zero and start counting. 
 void TimerReset() {
-	g_timer.Reset();  
+	CHiTimer_Reset();
 }
 
 // Find the differen in time between the last time that the TimerReset was called and now. 
 uint32_t TimerDifference() {
-	return g_timer.DiffTimeMicroSeconds(); 
+	return CHiTimer_DiffTimeMicroSeconds(); 
 }
 
 // When ever the MSTP stack recives a APDU message it will pass it up to this function for processing 
 // by the BACnet API stack. 
-void APDUCallBack(unsigned char* buffer, UINT length, unsigned char source) {
+void APDUCallBack(unsigned char* buffer, uint32_t length, unsigned char source) {
 	g_incomingFrame.push_back(MSTPAPDUFrame(source, buffer, length));
 }

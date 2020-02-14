@@ -22,25 +22,10 @@
 #ifndef __CHiTimer_h__
 #define __CHiTimer_h__
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <windows.h>
 #include <stdint.h>
 
-
-class CHiTimer
-{
-public:
-	CHiTimer();
-	void			Reset(void); // Starts the timer 
-	uint32_t		DiffTimeMicroSeconds(void);	// Gets the time between star and stop. 
-
-private:
-	LARGE_INTEGER	start;
-	LARGE_INTEGER	stop;
-	LARGE_INTEGER	frequency;
-};
-
-
+void CHiTimer_Init();
+void CHiTimer_Reset();
+uint32_t CHiTimer_DiffTimeMicroSeconds();
 
 #endif // __CHiTimer_h__

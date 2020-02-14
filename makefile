@@ -14,8 +14,8 @@ OBJECTFLAGS = -c -fmessage-length=0 -fPIC -MMD -MP
 LDFLAGS = -static
 
 SOURCES = $(wildcard BACnetServerMSTPExample/*.cpp) $(wildcard submodules/cas-bacnet-stack/adapters/cpp/*.cpp)  $(wildcard submodules/cas-bacnet-stack/submodules/cas-common/source/*.cpp) 
-OBJECTS = $(addprefix obj/,$(notdir $(SOURCES:.cpp=.o)))
-INCLUDES = -IBACnetServerMSTPExample -Isubmodules/cas-bacnet-stack/adapters/cpp -Isubmodules/cas-bacnet-stack/source -Isubmodules/cas-bacnet-stack/submodules/cas-common/source
+OBJECTS = $(addprefix obj/,$(notdir $(SOURCES:.cpp=.o))) obj/mstp.o obj/rs232.o
+INCLUDES = -IBACnetServerMSTPExample -Isubmodules/cas-bacnet-stack/adapters/cpp -Isubmodules/cas-bacnet-stack/source -Isubmodules/cas-bacnet-stack/submodules/cas-common/source -Isubmodules/serial
 LIBPATH = -Lbin 
 LIB = -ldl -lCASBACnetStack_x64_Release 
 
@@ -25,34 +25,26 @@ TARGET = $(NAME)
 all: $(NAME)
 
 $(NAME): $(OBJECTS)
+	@mkdir -p obj
 	@echo 'Building target: $@'
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(NAME) $(OBJECTS) $(LIBPATH) $(LIB)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 obj/%.o: BACnetServerMSTPExample/%.cpp
-	@mkdir -p obj
-	@echo 'Building file: $<'
-	@echo 'Invoking: GCC C++ Compiler'
 	$(CC) $(RELEASEFLAGS) $(CFLAGS) $(OBJECTFLAGS) $(INCLUDES) $(LIBPATH) -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o $@ $<
-	@echo 'Finished building: $<'
-	@echo ' '
 
 obj/%.o: submodules/cas-bacnet-stack/adapters/cpp/%.cpp
-	@mkdir -p obj
-	@echo 'Building file: $<'
-	@echo 'Invoking: GCC C++ Compiler'
 	$(CC) $(RELEASEFLAGS) $(CFLAGS) $(OBJECTFLAGS) $(INCLUDES) $(LIBPATH) -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o $@ $<
-	@echo 'Finished building: $<'
-	@echo ' '
 
 obj/%.o: submodules/cas-bacnet-stack/submodules/cas-common/source/%.cpp
-	@mkdir -p obj
-	@echo 'Building file: $<'
-	@echo 'Invoking: GCC C++ Compiler'
 	$(CC) $(RELEASEFLAGS) $(CFLAGS) $(OBJECTFLAGS) $(INCLUDES) $(LIBPATH) -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o $@ $<
-	@echo 'Finished building: $<'
-	@echo ' '
+
+obj/rs232.o : submodules/serial/rs232.h submodules/serial/rs232.c 
+	$(CC) $(RELEASEFLAGS) $(CFLAGS) $(OBJECTFLAGS) $(INCLUDES) $(LIBPATH) -c submodules/serial/rs232.c -o obj/rs232.o
+
+obj/mstp.o : submodules/cas-bacnet-stack/source/MSTP.h submodules/cas-bacnet-stack/source/MSTP.c 
+	$(CC) $(RELEASEFLAGS) $(CFLAGS) $(OBJECTFLAGS) $(INCLUDES) $(LIBPATH) -c submodules/cas-bacnet-stack/source/MSTP.c -o obj/mstp.o
 
 install:
 	install -D $(NAME) bin/$(NAME)

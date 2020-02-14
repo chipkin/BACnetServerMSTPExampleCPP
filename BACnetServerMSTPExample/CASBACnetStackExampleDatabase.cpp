@@ -30,7 +30,7 @@ void ExampleDatabase::Setup() {
 	this->device.systemStatus = 0; // operational (0), non-operational (4)
 
 	// MSTP 
-	this->device.serialPort = 5; 
+	this->device.serialPort = 0; 
 	this->device.baudRate = 9600; 
 	this->device.macAddress = 0;
 	this->device.maxInfoFrames = 1; // Default=1;

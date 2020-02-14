@@ -21,29 +21,19 @@
 ********************************************************************************/
  
 #include "CHiTimer.h"
+#include <chrono> 
 
-CHiTimer::CHiTimer()
-{
-	QueryPerformanceFrequency(&this->frequency);
-    Reset(); 
-}
-void  CHiTimer::Reset(void)
-{
-	QueryPerformanceCounter(&start);
-	QueryPerformanceCounter(&stop);
-}
+std::chrono::high_resolution_clock::time_point CHiTimer_start;
+std::chrono::high_resolution_clock::time_point CHiTimer_stop;
 
-// returns the time between the last two frams calls 
-uint32_t CHiTimer::DiffTimeMicroSeconds()
-{
-	QueryPerformanceCounter(&stop);
-	/*
-	 * QueryPerformanceFrequency() gives you the number of counter ticks per second. 
-	 * QueryPerformanceCounter() tells you what the hi-res tick count is. So, subtract 
-	 * tSart from tStop, giving the number of ticks over the period to measure. Multiply 
-	 * this result by the number of microseconds in a second (1000000) and finally divide 
-	 * the value by the resolution of the timer. This gives the final answer in microseconds. 
-	 * If you require an answer in milliseconds then just divide again by 1000.
-	 */
-	return (uint32_t) ( (this->stop.QuadPart - this->start.QuadPart) * 1000000 / this->frequency.QuadPart ) ;
+void CHiTimer_Init() {
+    CHiTimer_Reset(); 
+}
+void CHiTimer_Reset() {
+    CHiTimer_start = std::chrono::high_resolution_clock::now();
+}
+uint32_t CHiTimer_DiffTimeMicroSeconds() {
+    CHiTimer_stop = std::chrono::high_resolution_clock::now();
+    auto microseconds = std::chrono::duration_cast<std::chrono::microseconds> (CHiTimer_stop - CHiTimer_start);
+    return (uint32_t)microseconds.count(); 
 }
