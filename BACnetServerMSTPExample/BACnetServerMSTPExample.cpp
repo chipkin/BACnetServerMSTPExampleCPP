@@ -23,7 +23,7 @@
 #ifndef __GNUC__ // Windows
 	#include <windows.h> // Sleep 
 #endif 
-/*
+
 #ifdef __GNUC__
 #include <termios.h>
 #include <unistd.h>
@@ -32,7 +32,7 @@ void Sleep(int milliseconds) {
 	usleep(milliseconds * 1000 );
 }
 #endif //
-*/
+
 // Globals
 // =======================================
 ExampleDatabase g_database; // The example database that stores current values.
@@ -49,6 +49,11 @@ void ThreadSleep(uint32_t length);
 void TimerReset();
 uint32_t TimerDifference();
 void APDUCallBack(unsigned char* buffer, uint32_t length, unsigned char source);
+void MSTPFrameCallBack(uint8_t* buffer, uint32_t length); 
+void MSTPDebugLog(const char* message);
+
+// Helper
+void DebugMSTPFrame(uint8_t* buffer, uint32_t length);
 
 struct MSTPAPDUFrame : public MSTPFrame
 {
@@ -103,6 +108,9 @@ int main(int argc, char* argv[])
 		std::cout << "FYI: Using macAddress=[" << (int) g_database.device.macAddress << "]" << std::endl;
 	}
 
+
+
+
 	// 1. Load the CAS BACnet stack functions
 	// ---------------------------------------------------------------------------
 	std::cout << "FYI: Loading CAS BACnet Stack functions... "; 
@@ -125,10 +133,42 @@ int main(int argc, char* argv[])
 
 	// Configure the highspeed timer. 
 	CHiTimer_Init();
-	// g_timer.Reset(); 
+
+	
+	// Debug 
+	/*
+	// Test the timers 
+	int testNumber = 0; 
+	uint32_t debugTime = 0; 
+	uint8_t testBuffer[8] = { 0x55, 0xFF, 0x03, 0x99, 0xFF, 0xFF, 0xFF, 0xFF };
+	SendByte(testBuffer, 8);
+
+	CHiTimer_Reset();
+	Sleep(0);
+	debugTime = CHiTimer_DiffTimeMicroSeconds();
+	std::cout << std::dec << "Test #" << testNumber++ << ", Results=" << debugTime << ", Expecting: 10" << std::endl;
+	testBuffer[3] = testNumber; 
+	SendByte(testBuffer, 8);
+
+	CHiTimer_Reset();
+	Sleep(10); 
+	debugTime = CHiTimer_DiffTimeMicroSeconds(); 
+	std::cout << std::dec << "Test #" << testNumber++ << ", Results=" << debugTime << ", Expecting: ~10,000" << std::endl;
+	testBuffer[3] = testNumber;
+	SendByte(testBuffer, 8);
+
+	CHiTimer_Reset();
+	Sleep(100);
+	debugTime = CHiTimer_DiffTimeMicroSeconds();
+	std::cout << std::dec << "Test #" << testNumber++ << ", Results=" << debugTime << ", Expecting: ~100,000" << std::endl;
+	testBuffer[3] = testNumber;
+	SendByte(testBuffer, 8);
+	*/
+
+
 
 	// Configure the MSTP thread 
-	if (!MSTP_Init(RecvByte, SendByte, ThreadSleep, APDUCallBack, TimerReset, TimerDifference, g_database.device.macAddress, NULL)) {
+	if (!MSTP_Init(RecvByte, SendByte, ThreadSleep, APDUCallBack, TimerReset, TimerDifference, g_database.device.macAddress, MSTPFrameCallBack, MSTPDebugLog)) {
 		std::cerr << "Error: Failed to start MSTP stack" << std::endl;
 		return 0;
 	}
@@ -163,6 +203,10 @@ int main(int argc, char* argv[])
 		std::cerr << "Failed to add Device." << std::endl;
 		return false;
 	}
+	if (!fpAddObject(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_ANALOG_INPUT, 0)) {
+		std::cerr << "Failed to add Analog input(0)." << std::endl;
+		return false;
+	}
 	std::cout << "Created Device." << std::endl; 
 
 	fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_DEVICE, g_database.device.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_MAX_INFO_FRAMES, true);
@@ -179,9 +223,11 @@ int main(int argc, char* argv[])
 		return false;
 	}
 
+	RS232_flushRXTX(g_database.device.serialPort);
+
 	// 5. Start the main loop
 	// ---------------------------------------------------------------------------
-	std::cout << "FYI: Entering main loop..." << std::endl << std::flush;
+	std::cout << "FYI: Entering main loop..." << std::endl;
 	for (;;) {
 		MSTP_Loop();
 
@@ -200,6 +246,8 @@ int main(int argc, char* argv[])
 // Callback used by the BACnet Stack to check if there is a message to process
 uint16_t CallbackReceiveMessage(uint8_t* message, const uint16_t maxMessageLength, uint8_t* receivedConnectionString, const uint8_t maxConnectionStringLength, uint8_t* receivedConnectionStringLength, uint8_t* networkType)
 {
+	// std::cout << "R";
+
 	// Check parameters
 	if (message == NULL || maxMessageLength == 0) {
 		std::cerr << "Invalid input buffer" << std::endl;
@@ -207,12 +255,12 @@ uint16_t CallbackReceiveMessage(uint8_t* message, const uint16_t maxMessageLengt
 	}
 	if (receivedConnectionString == NULL || maxConnectionStringLength == 0) {
 		std::cerr << "Invalid connection string buffer" << std::endl;
-		return 0;
+		return 0; 
 	}
 
 	if (g_incomingFrame.size() <= 0) {
 		// Call Sleep to give some time back to the system
-		// Sleep(1);
+		Sleep(1);
 		return 0; // Nothing recived. 
 	}
 
@@ -320,9 +368,8 @@ bool RecvByte(unsigned char* byte) {
 	}
 
 	// Found a byte. 
-	// std::cout << std::hex << std::setw(2) << std::setfill('0') << (int) *byte ;
-	// std::cout << " ";
-	std::cout << ".";
+	std::cout << std::hex << std::setw(2) << std::setfill('0') << (int) *byte ;
+	std::cout << "_";	
 	return true;
 }
 
@@ -332,15 +379,15 @@ bool RecvByte(unsigned char* byte) {
 //   False - Could not send the bytes. Try again later. 
 bool SendByte(unsigned char* byte, uint32_t length) {
 
-	std::cout << "+";
-	/*
-	std::cout << std::endl << "TX: ";
+	// Debug print
 	for (unsigned int offset = 0; offset < length; offset++) {
 		std::cout << std::hex << std::setw(2) << std::setfill('0') << (int) byte[offset];
 		std::cout << " "; 
 	}
-	std::cout << std::endl; 
-	*/
+	DebugMSTPFrame(byte, length);
+	std::cout << std::endl; 	
+
+
 	if (RS232_SendBuf(g_database.device.serialPort, byte, length) != length) {
 		// Bytes could not be sent 
 		return false;
@@ -359,7 +406,7 @@ void ThreadSleep(uint32_t length) {
 	if (length < 1) {
 		return;
 	}
-	// Sleep(length);
+	Sleep(length);
 }
 
 // Reset the high speed timer back to zero and start counting. 
@@ -369,11 +416,58 @@ void TimerReset() {
 
 // Find the differen in time between the last time that the TimerReset was called and now. 
 uint32_t TimerDifference() {
-	return CHiTimer_DiffTimeMicroSeconds(); 
+	uint32_t t = CHiTimer_DiffTimeMicroSeconds();
+	// std::cout << "(" << std::dec << t << ") ";
+	return t; 
 }
 
 // When ever the MSTP stack recives a APDU message it will pass it up to this function for processing 
 // by the BACnet API stack. 
 void APDUCallBack(unsigned char* buffer, uint32_t length, unsigned char source) {
 	g_incomingFrame.push_back(MSTPAPDUFrame(source, buffer, length));
+}
+
+void MSTPDebugLog(const char* message) {
+	std::cout << message << std::endl; 
+}
+
+void DebugMSTPFrame(uint8_t* buffer, uint32_t length) {
+	if (length < 3) {
+		return;
+	}
+
+	// +2 is the preamble
+	std::cout << "  {src=" << std::hex << std::setw(2) << std::setfill('0') << (int)buffer[2 + MSTP_HEADER_INDEX_SOURCE];
+	std::cout << ", dest=" << std::hex << std::setw(2) << std::setfill('0') << (int)buffer[2 + MSTP_HEADER_INDEX_DESTINATION] << " ";
+	
+	switch (buffer[2 + MSTP_HEADER_INDEX_FRAMETYPE]) {
+	case MSTP_FRAME_TYPE_TOKEN:
+		std::cout << "TOKEN";
+		break;
+	case MSTP_FRAME_TYPE_POLL_FOR_MASTER:
+		std::cout << "POLL_FOR_MASTER";
+		break;
+	case MSTP_FRAME_TYPE_REPLY_TO_POLL_FOR_MASTER:
+		std::cout << "REPLY_TO_POLL_FOR_MASTER";
+		break;
+	case MSTP_FRAME_TYPE_BACNET_DATA_EXPECTING_REPLY:
+		std::cout << "DATA_EXPECTING_REPLY";
+		break;
+	case MSTP_FRAME_TYPE_BACNET_DATA_NOT_EXPECTING_REPLY:
+		std::cout << "DATA_NOT_EXPECTING_REPLY";
+		break;
+	case MSTP_FRAME_TYPE_REPLY_POSTPONED:
+		std::cout << "REPLY_POSTPONED";
+		break;
+	default:
+		std::cout << "UNKNOWN=" << std::hex << std::setw(2) << std::setfill('0') << (int)buffer[2];
+		break;
+	}
+
+	std::cout << "}";
+}
+
+void MSTPFrameCallBack(uint8_t* buffer, uint32_t length) {
+	DebugMSTPFrame(buffer, length);
+	std::cout << std::endl;
 }

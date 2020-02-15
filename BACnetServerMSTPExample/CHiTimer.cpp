@@ -35,5 +35,9 @@ void CHiTimer_Reset() {
 uint32_t CHiTimer_DiffTimeMicroSeconds() {
     CHiTimer_stop = std::chrono::high_resolution_clock::now();
     auto microseconds = std::chrono::duration_cast<std::chrono::microseconds> (CHiTimer_stop - CHiTimer_start);
-    return (uint32_t)microseconds.count(); 
+    
+
+    // Return a minimum of 10 micro seconds even if the count is zero. 
+    uint32_t ret = (uint32_t)microseconds.count();
+    return ret < 10 ? 10 : ret;
 }
