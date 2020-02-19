@@ -32,6 +32,11 @@ class ExampleDatabaseBaseObject
 		uint32_t instance ; 
 };
 
+class ExampleDatabaseAnalogValue : public ExampleDatabaseBaseObject 
+{
+	public:
+		float presentValue;		
+};
 class ExampleDatabaseDevice : public ExampleDatabaseBaseObject 
 {
 	public:
@@ -51,6 +56,7 @@ class ExampleDatabaseDevice : public ExampleDatabaseBaseObject
 class ExampleDatabase {
 
 	public:
+		ExampleDatabaseAnalogValue analogValue;
 		ExampleDatabaseDevice device;
 
 	// Constructor / Deconstructor
@@ -65,6 +71,7 @@ class ExampleDatabase {
 
 	// Helper Functions	
 	void LoadNetworkPortProperties();
+
 };
 
 

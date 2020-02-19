@@ -30,11 +30,15 @@ void ExampleDatabase::Setup() {
 	this->device.systemStatus = 0; // operational (0), non-operational (4)
 
 	// MSTP 
-	this->device.serialPort = 0; 
 	this->device.baudRate = 9600; 
 	this->device.macAddress = 0;
 	this->device.maxInfoFrames = 1; // Default=1;
 	this->device.maxMaster = 20; // Default=127;
+
+	// Objects
+	this->analogValue.instance = 2;
+	this->analogValue.objectName = "AnalogValue Diamond";
+	this->analogValue.presentValue = 5.43f;
 
 	this->LoadNetworkPortProperties() ; 
 }

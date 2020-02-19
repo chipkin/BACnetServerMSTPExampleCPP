@@ -24,14 +24,29 @@
 	#include <windows.h> // Sleep 
 #endif 
 
-#ifdef __GNUC__
+#ifndef __GNUC__ // Windows
+#include <conio.h> // _kbhit
+#else // Linux 
+#include <sys/ioctl.h>
+#include <termios.h>
+bool _kbhit() {
+	termios term;
+	tcgetattr(0, &term);
+	termios term2 = term;
+	term2.c_lflag &= ~ICANON;
+	tcsetattr(0, TCSANOW, &term2);
+	int byteswaiting;
+	ioctl(0, FIONREAD, &byteswaiting);
+	tcsetattr(0, TCSANOW, &term);
+	return byteswaiting > 0;
+	}
 #include <termios.h>
 #include <unistd.h>
 #include <fcntl.h>
 void Sleep(int milliseconds) {
-	usleep(milliseconds * 1000 );
+	usleep(milliseconds * 1000);
 }
-#endif //
+#endif // __GNUC__
 
 // Globals
 // =======================================
@@ -44,20 +59,23 @@ const uint32_t MAX_XML_RENDER_BUFFER_LENGTH = 1024 * 20;
 
 // MSTP callbacks 
 bool RecvByte(unsigned char* byte);
-bool SendByte(unsigned char* byte, uint32_t length);
+bool SendByte(unsigned char* byte, uint16_t length);
 void ThreadSleep(uint32_t length);
 void TimerReset();
 uint32_t TimerDifference();
-void APDUCallBack(unsigned char* buffer, uint32_t length, unsigned char source);
-void MSTPFrameCallBack(uint8_t* buffer, uint32_t length); 
+void APDUCallBack(unsigned char* buffer, uint16_t length, unsigned char source);
+void MSTPFrameCallBack(uint8_t* buffer, uint16_t length); 
 void MSTPDebugLog(const char* message);
 
 // Helper
-void DebugMSTPFrame(uint8_t* buffer, uint32_t length);
+void DebugMSTPFrame(uint8_t* buffer, uint16_t length);
+
+std::map<std::string, uint32_t> g_statCounter;
+void printMSTPStats(); 
 
 struct MSTPAPDUFrame : public MSTPFrame
 {
-	MSTPAPDUFrame(uint8_t destination, uint8_t* buffer, uint32_t length) {
+	MSTPAPDUFrame(uint8_t destination, uint8_t* buffer, uint16_t length) {
 		if (length > MSTP_MAX_PACKET_OCTETS) {
 			this->length = 0;
 			return;
@@ -82,6 +100,10 @@ time_t CallbackGetSystemTime();
 // Get Property Functions
 bool CallbackGetPropertyCharString(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, char* value, uint32_t* valueElementCount, const uint32_t maxElementCount, uint8_t* encodingType, const bool useArrayIndex, const uint32_t propertyArrayIndex);
 bool CallbackGetPropertyUInt(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, uint32_t* value, const bool useArrayIndex, const uint32_t propertyArrayIndex);
+bool CallbackGetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, float* value, const bool useArrayIndex, const uint32_t propertyArrayIndex);
+
+// Set Property Functions
+bool CallbackSetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, const float value, const bool useArrayIndex, const uint32_t propertyArrayIndex, const uint8_t priority, unsigned int* errorCode);
 
 int main(int argc, char* argv[])
 {
@@ -97,14 +119,14 @@ int main(int argc, char* argv[])
 			std::cerr << "Could not detect port number from string. port=[" << argv[2] << "]... Accepted string COM4, ttyS4, etc... " << std::endl;
 			return 0; 
 		}
-		g_database.device.serialPort = port; 
+		g_database.device.serialPort = (uint8_t)port; 
 		std::cout << "FYI: Using comport=[" << argv[1] << "], Portnr=[" << (int) g_database.device.serialPort << "]" << std::endl ;
 	}
 	if (argc >= 3) {
 		g_database.device.baudRate = atoi(argv[2]);
 	}
 	if (argc >= 4) {
-		g_database.device.macAddress = atoi(argv[3]);
+		g_database.device.macAddress = (uint8_t)atoi(argv[3]);
 		std::cout << "FYI: Using macAddress=[" << (int) g_database.device.macAddress << "]" << std::endl;
 	}
 
@@ -133,40 +155,7 @@ int main(int argc, char* argv[])
 
 	// Configure the highspeed timer. 
 	CHiTimer_Init();
-
 	
-	// Debug 
-	/*
-	// Test the timers 
-	int testNumber = 0; 
-	uint32_t debugTime = 0; 
-	uint8_t testBuffer[8] = { 0x55, 0xFF, 0x03, 0x99, 0xFF, 0xFF, 0xFF, 0xFF };
-	SendByte(testBuffer, 8);
-
-	CHiTimer_Reset();
-	Sleep(0);
-	debugTime = CHiTimer_DiffTimeMicroSeconds();
-	std::cout << std::dec << "Test #" << testNumber++ << ", Results=" << debugTime << ", Expecting: 10" << std::endl;
-	testBuffer[3] = testNumber; 
-	SendByte(testBuffer, 8);
-
-	CHiTimer_Reset();
-	Sleep(10); 
-	debugTime = CHiTimer_DiffTimeMicroSeconds(); 
-	std::cout << std::dec << "Test #" << testNumber++ << ", Results=" << debugTime << ", Expecting: ~10,000" << std::endl;
-	testBuffer[3] = testNumber;
-	SendByte(testBuffer, 8);
-
-	CHiTimer_Reset();
-	Sleep(100);
-	debugTime = CHiTimer_DiffTimeMicroSeconds();
-	std::cout << std::dec << "Test #" << testNumber++ << ", Results=" << debugTime << ", Expecting: ~100,000" << std::endl;
-	testBuffer[3] = testNumber;
-	SendByte(testBuffer, 8);
-	*/
-
-
-
 	// Configure the MSTP thread 
 	if (!MSTP_Init(RecvByte, SendByte, ThreadSleep, APDUCallBack, TimerReset, TimerDifference, g_database.device.macAddress, MSTPFrameCallBack, MSTPDebugLog)) {
 		std::cerr << "Error: Failed to start MSTP stack" << std::endl;
@@ -192,7 +181,10 @@ int main(int argc, char* argv[])
 	// Get Property Callback Functions
 	fpRegisterCallbackGetPropertyCharacterString(CallbackGetPropertyCharString);
 	fpRegisterCallbackGetPropertyUnsignedInteger(CallbackGetPropertyUInt);
+	fpRegisterCallbackGetPropertyReal(CallbackGetPropertyReal);
 
+	// Set Property Callback Functions
+	fpRegisterCallbackSetPropertyReal(CallbackSetPropertyReal);
 
 	// 4. Setup the BACnet device. 
 	// ---------------------------------------------------------------------------
@@ -203,14 +195,26 @@ int main(int argc, char* argv[])
 		std::cerr << "Failed to add Device." << std::endl;
 		return false;
 	}
-	if (!fpAddObject(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_ANALOG_INPUT, 0)) {
-		std::cerr << "Failed to add Analog input(0)." << std::endl;
+	if (!fpAddObject(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_ANALOG_VALUE, g_database.analogValue.instance)) {
+		std::cerr << "Failed to add Analog value(2)." << std::endl;
 		return false;
 	}
-	std::cout << "Created Device." << std::endl; 
+	std::cout << "Created Device." << std::endl;
 
+	// Enable services 
+	std::cout << "Enabling WriteProperty service... ";
+	if (!fpSetServiceEnabled(g_database.device.instance, CASBACnetStackExampleConstants::SERVICE_WRITE_PROPERTY, true)) {
+		std::cerr << "Failed to enabled the WriteProperty" << std::endl;
+		return false;
+	}
+	std::cout << "OK" << std::endl;
+
+	// Enable properties 
+	std::cout << "Enabling device optional properties. Max_info_frames, max_master... ";
 	fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_DEVICE, g_database.device.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_MAX_INFO_FRAMES, true);
 	fpSetPropertyEnabled(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_DEVICE, g_database.device.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_MAX_MASTER, true);
+	fpSetPropertyWritable(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_ANALOG_VALUE, g_database.analogValue.instance, CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_PRESENT_VALUE, true);
+	std::cout << "OK" << std::endl;
 
 
 	// 4. Send I-Am of this device
@@ -236,18 +240,22 @@ int main(int argc, char* argv[])
 
 		// Update values in the example database
 		g_database.Loop();
+
+		// Check to see if the user hit any key
+		if (_kbhit()) {
+			printMSTPStats();
+			getchar(); // Remove the key from the buffer. 
+		}
 	}
 
 	// All done. 
-	return 0;
+	return 0; // Unreachable 
 }
 
 
 // Callback used by the BACnet Stack to check if there is a message to process
 uint16_t CallbackReceiveMessage(uint8_t* message, const uint16_t maxMessageLength, uint8_t* receivedConnectionString, const uint8_t maxConnectionStringLength, uint8_t* receivedConnectionStringLength, uint8_t* networkType)
 {
-	// std::cout << "R";
-
 	// Check parameters
 	if (message == NULL || maxMessageLength == 0) {
 		std::cerr << "Invalid input buffer" << std::endl;
@@ -320,8 +328,12 @@ time_t CallbackGetSystemTime()
 }
 
 // Callback used by the BACnet Stack to get Character String property values from the user
-bool CallbackGetPropertyCharString(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, char* value, uint32_t* valueElementCount, const uint32_t maxElementCount, uint8_t* encodingType, const bool useArrayIndex, const uint32_t propertyArrayIndex)
+bool CallbackGetPropertyCharString(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, char* value, uint32_t* valueElementCount, const uint32_t maxElementCount, uint8_t* /*encodingType*/, const bool /*useArrayIndex*/, const uint32_t /*propertyArrayIndex*/)
 {
+	if (deviceInstance != g_database.device.instance) {
+		return false;
+	}
+
 	// Example of Object Name property
 	if (propertyIdentifier == CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_OBJECT_NAME) {
 
@@ -336,22 +348,149 @@ bool CallbackGetPropertyCharString(const uint32_t deviceInstance, const uint16_t
 			*valueElementCount = (uint32_t)stringSize;
 			return true;
 		}
+		else if (objectType == CASBACnetStackExampleConstants::OBJECT_TYPE_ANALOG_VALUE && objectInstance == g_database.analogValue.instance) {
+			stringSize = g_database.analogValue.objectName.size();
+			if (stringSize > maxElementCount) {
+				std::cerr << "Error: Not enough space to store full name of objectType=[" << objectType << "], objectInstance=[" << objectInstance << " ]" << std::endl;
+				return false;
+			}
+			memcpy(value, g_database.analogValue.objectName.c_str(), stringSize);
+			*valueElementCount = (uint32_t)stringSize;
+			return true;
+		}
 	}
 	return false;
 }
 
 
 // Callback used by the BACnet Stack to get Unsigned Integer property values from the user
-bool CallbackGetPropertyUInt(uint32_t deviceInstance, uint16_t objectType, uint32_t objectInstance, uint32_t propertyIdentifier, uint32_t* value, bool useArrayIndex, uint32_t propertyArrayIndex)
+bool CallbackGetPropertyUInt(uint32_t deviceInstance, uint16_t objectType, uint32_t objectInstance, uint32_t propertyIdentifier, uint32_t* value, bool /*useArrayIndex*/, uint32_t /*propertyArrayIndex*/)
 {
-	if (propertyIdentifier == CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_MAX_INFO_FRAMES && objectType == CASBACnetStackExampleConstants::OBJECT_TYPE_DEVICE) {
-		*value = g_database.device.maxInfoFrames; 
-		return true; 
-	} else if (propertyIdentifier == CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_MAX_MASTER && objectType == CASBACnetStackExampleConstants::OBJECT_TYPE_DEVICE) {
-		*value = g_database.device.maxMaster;
-		return true;
+	if (deviceInstance != g_database.device.instance) {
+		return false;
+	}
+
+	if (objectType == CASBACnetStackExampleConstants::OBJECT_TYPE_DEVICE && objectInstance == g_database.device.instance) {
+		if (propertyIdentifier == CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_MAX_INFO_FRAMES) {
+			*value = g_database.device.maxInfoFrames;
+			return true;
+		}
+		else if (propertyIdentifier == CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_MAX_MASTER) {
+			*value = g_database.device.maxMaster;
+			return true;
+		}
 	}
 	return false; 
+}
+
+bool CallbackGetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, float* value, const bool useArrayIndex, const uint32_t propertyArrayIndex)
+{
+	if (deviceInstance != g_database.device.instance) {
+		return false;
+	}
+
+	if (propertyIdentifier == CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_PRESENT_VALUE) {
+		if (objectType == CASBACnetStackExampleConstants::OBJECT_TYPE_ANALOG_VALUE && objectInstance == g_database.analogValue.instance) {
+			*value = g_database.analogValue.presentValue;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool CallbackSetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, const float value, const bool useArrayIndex, const uint32_t propertyArrayIndex, const uint8_t priority, unsigned int* errorCode) {
+	if (deviceInstance != g_database.device.instance) {
+		return false; // Not this device.
+	}
+	if (propertyIdentifier == CASBACnetStackExampleConstants::PROPERTY_IDENTIFIER_PRESENT_VALUE) {
+		// Example of setting Analog Value Present Value Property
+		if (objectType == CASBACnetStackExampleConstants::OBJECT_TYPE_ANALOG_VALUE && objectInstance == g_database.analogValue.instance) {
+			g_database.analogValue.presentValue = value;
+			return true;
+		}
+	}
+	return false; 
+
+}
+
+// ----------------------------------------------------------------------------
+void printMSTPStats() {
+
+	std::cout << std::endl;
+	std::cout << std::endl;
+	std::cout << "MSTP Stats:" << std::endl; 
+	std::cout << "-----------" << std::endl;
+
+	const int PARAMETER_NAME_WIDTH  = 25;
+	const int PARAMETER_VALUE_WIDTH = 5;
+
+	// Print stats. 
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "sentBytes: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.sentBytes;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "recvBytes: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.recvBytes;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "eatAnOctet: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.eatAnOctet;
+	std::cout << std::endl;
+
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "sentFrames: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.sentFrames;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "recvFrames: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.recvFrames;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "sentPollForMaster: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.sentFramePollForMaster;
+	std::cout << std::endl;
+
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "sentAPDU: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.sentAPDU;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "recvAPDU: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.recvAPDU;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "sentReplyPollForMaster: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.sentFrameReplyPollForMaster;
+	std::cout << std::endl;
+
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "sentLastType: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.sentLastFrameType;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "recvLastType: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.recvLastFrameType;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "sentToken: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.sentFrameToken;
+	std::cout << std::endl;
+	
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << " " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << " ";
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "recvInvalid: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.recvInvalidFrame;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "hasToken: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.hasToken;
+	std::cout << std::endl;	
+	
+	// Print status 
+	std::cout << "MSTP State:" << std::endl;
+	std::cout << "-----------" << std::endl;
+
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "This station (TS):" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.TS;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "EventCount:" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.EventCount;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "master_state:" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.master_state;
+	std::cout << std::endl;
+
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "Next Station (NS):" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.NS;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "FrameCount:" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.FrameCount;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "recv_state:" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.recv_state;
+	std::cout << std::endl;
+
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "Poll Station (PS):" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.PS;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "TokenCount:" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.TokenCount;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "SoleMaster:" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.SoleMaster;
+	std::cout << std::endl;
+
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "Previous Station (AS):" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.AS;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "RetryCount:" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.RetryCount;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "SilenceTimerMS:" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (uint32_t)mstp_runningVariables.SilenceTimerMicroSeconds;
+	std::cout << std::endl;	
+	std::cout << std::endl;
+
+	std::cout << "MSTP Events:" << std::endl;
+	std::cout << "------------" << std::endl;
+
+	int count = 0; 
+	for (std::map<std::string, uint32_t>::iterator itr = g_statCounter.begin(); itr != g_statCounter.end(); itr++) {
+		count++; 
+		std::cout << std::setw(PARAMETER_NAME_WIDTH-1) << std::setfill(' ')  << (*itr).first ;
+		std::cout << ": ";
+		std::cout << std::setw(PARAMETER_VALUE_WIDTH-1) << std::setfill(' ') << std::dec << (*itr).second; 
+
+		if (count % 3 == 0) {
+			std::cout << std::endl;
+		}
+	}
+	std::cout << std::endl;
+	
 }
 
 // MSTP callbacks 
@@ -377,7 +516,7 @@ bool RecvByte(unsigned char* byte) {
 // Return
 //   True  - The bytes where succesfuly sent. 
 //   False - Could not send the bytes. Try again later. 
-bool SendByte(unsigned char* byte, uint32_t length) {
+bool SendByte(unsigned char* byte, uint16_t length) {
 
 	// Debug print
 	for (unsigned int offset = 0; offset < length; offset++) {
@@ -392,12 +531,8 @@ bool SendByte(unsigned char* byte, uint32_t length) {
 		// Bytes could not be sent 
 		return false;
 	}
-
 	return true;
 }
-
-
-
 
 // The MSTP thread does not need attention for the next "length" amount of time. 
 // This function can do nothing, and the MSTP thread will consumed as much proccessing power 
@@ -423,15 +558,17 @@ uint32_t TimerDifference() {
 
 // When ever the MSTP stack recives a APDU message it will pass it up to this function for processing 
 // by the BACnet API stack. 
-void APDUCallBack(unsigned char* buffer, uint32_t length, unsigned char source) {
+void APDUCallBack(unsigned char* buffer, uint16_t length, unsigned char source) {
 	g_incomingFrame.push_back(MSTPAPDUFrame(source, buffer, length));
 }
 
 void MSTPDebugLog(const char* message) {
-	std::cout << message << std::endl; 
+	g_statCounter[std::string(message)]++;
+
+	std::cout << "[" << message << "]" << std::endl; 
 }
 
-void DebugMSTPFrame(uint8_t* buffer, uint32_t length) {
+void DebugMSTPFrame(uint8_t* buffer, uint16_t length) {
 	if (length < 3) {
 		return;
 	}
@@ -467,7 +604,8 @@ void DebugMSTPFrame(uint8_t* buffer, uint32_t length) {
 	std::cout << "}";
 }
 
-void MSTPFrameCallBack(uint8_t* buffer, uint32_t length) {
+void MSTPFrameCallBack(uint8_t* buffer, uint16_t length) {
 	DebugMSTPFrame(buffer, length);
 	std::cout << std::endl;
 }
+
