@@ -247,9 +247,6 @@ int main(int argc, char* argv[])
 			getchar(); // Remove the key from the buffer. 
 		}
 	}
-
-	// All done. 
-	return 0; // Unreachable 
 }
 
 
@@ -383,7 +380,7 @@ bool CallbackGetPropertyUInt(uint32_t deviceInstance, uint16_t objectType, uint3
 	return false; 
 }
 
-bool CallbackGetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, float* value, const bool useArrayIndex, const uint32_t propertyArrayIndex)
+bool CallbackGetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, float* value, const bool , const uint32_t )
 {
 	if (deviceInstance != g_database.device.instance) {
 		return false;
@@ -398,7 +395,7 @@ bool CallbackGetPropertyReal(const uint32_t deviceInstance, const uint16_t objec
 	return false;
 }
 
-bool CallbackSetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, const float value, const bool useArrayIndex, const uint32_t propertyArrayIndex, const uint8_t priority, unsigned int* errorCode) {
+bool CallbackSetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, const float value, const bool , const uint32_t , const uint8_t , unsigned int* ) {
 	if (deviceInstance != g_database.device.instance) {
 		return false; // Not this device.
 	}
@@ -415,14 +412,15 @@ bool CallbackSetPropertyReal(const uint32_t deviceInstance, const uint16_t objec
 
 // ----------------------------------------------------------------------------
 void printMSTPStats() {
+	const int PARAMETER_NAME_WIDTH = 25;
+	const int PARAMETER_VALUE_WIDTH = 5;
 
 	std::cout << std::endl;
 	std::cout << std::endl;
+
+#ifdef MSTP_DEBUG
 	std::cout << "MSTP Stats:" << std::endl; 
 	std::cout << "-----------" << std::endl;
-
-	const int PARAMETER_NAME_WIDTH  = 25;
-	const int PARAMETER_VALUE_WIDTH = 5;
 
 	// Print stats. 
 	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "sentBytes: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.sentBytes;
@@ -449,6 +447,8 @@ void printMSTPStats() {
 	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "recvInvalid: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.recvInvalidFrame;
 	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "hasToken: " << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_stats.hasToken;
 	std::cout << std::endl;	
+
+#endif // MSTP_DEBUG
 	
 	// Print status 
 	std::cout << "MSTP State:" << std::endl;
@@ -475,6 +475,7 @@ void printMSTPStats() {
 	std::cout << std::endl;	
 	std::cout << std::endl;
 
+#ifdef MSTP_DEBUG
 	std::cout << "MSTP Events:" << std::endl;
 	std::cout << "------------" << std::endl;
 
@@ -490,7 +491,8 @@ void printMSTPStats() {
 		}
 	}
 	std::cout << std::endl;
-	
+#endif // MSTP_DEBUG
+
 }
 
 // MSTP callbacks 
@@ -506,9 +508,12 @@ bool RecvByte(unsigned char* byte) {
 		return false;
 	}
 
+#ifdef MSTP_DEBUG
 	// Found a byte. 
 	std::cout << std::hex << std::setw(2) << std::setfill('0') << (int) *byte ;
 	std::cout << "_";	
+#endif // MSTP_DEBUG
+
 	return true;
 }
 
@@ -518,6 +523,7 @@ bool RecvByte(unsigned char* byte) {
 //   False - Could not send the bytes. Try again later. 
 bool SendByte(unsigned char* byte, uint16_t length) {
 
+#ifdef MSTP_DEBUG
 	// Debug print
 	for (unsigned int offset = 0; offset < length; offset++) {
 		std::cout << std::hex << std::setw(2) << std::setfill('0') << (int) byte[offset];
@@ -525,7 +531,7 @@ bool SendByte(unsigned char* byte, uint16_t length) {
 	}
 	DebugMSTPFrame(byte, length);
 	std::cout << std::endl; 	
-
+#endif // MSTP_DEBUG
 
 	if (RS232_SendBuf(g_database.device.serialPort, byte, length) != length) {
 		// Bytes could not be sent 
@@ -551,9 +557,7 @@ void TimerReset() {
 
 // Find the differen in time between the last time that the TimerReset was called and now. 
 uint32_t TimerDifference() {
-	uint32_t t = CHiTimer_DiffTimeMicroSeconds();
-	// std::cout << "(" << std::dec << t << ") ";
-	return t; 
+	return CHiTimer_DiffTimeMicroSeconds();
 }
 
 // When ever the MSTP stack recives a APDU message it will pass it up to this function for processing 
@@ -563,9 +567,10 @@ void APDUCallBack(unsigned char* buffer, uint16_t length, unsigned char source) 
 }
 
 void MSTPDebugLog(const char* message) {
-	g_statCounter[std::string(message)]++;
-
-	std::cout << "[" << message << "]" << std::endl; 
+	#ifdef MSTP_DEBUG
+		g_statCounter[std::string(message)]++;
+		std::cout << "[" << message << "]" << std::endl; 
+	#endif // MSTP_DEBUG
 }
 
 void DebugMSTPFrame(uint8_t* buffer, uint16_t length) {
@@ -605,7 +610,10 @@ void DebugMSTPFrame(uint8_t* buffer, uint16_t length) {
 }
 
 void MSTPFrameCallBack(uint8_t* buffer, uint16_t length) {
-	DebugMSTPFrame(buffer, length);
-	std::cout << std::endl;
+
+	#ifdef MSTP_DEBUG
+		DebugMSTPFrame(buffer, length);
+		std::cout << std::endl;
+	#endif // MSTP_DEBUG
 }
 
