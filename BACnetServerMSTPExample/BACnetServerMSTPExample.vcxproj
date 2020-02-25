@@ -94,11 +94,11 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;CAS_BACNET_STACK_LIB_TYPE_LIB</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;%(AdditionalIncludeDirectories);$(SolutionDir)..\submodules\serial</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -111,11 +111,11 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;CAS_BACNET_STACK_LIB_TYPE_LIB</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;%(AdditionalIncludeDirectories);$(SolutionDir)..\submodules\serial</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -128,13 +128,13 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;CAS_BACNET_STACK_LIB_TYPE_LIB</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;%(AdditionalIncludeDirectories);$(SolutionDir)..\submodules\serial</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -149,13 +149,13 @@
     <ClCompile>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;CAS_BACNET_STACK_LIB_TYPE_LIB</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\submodules\cas-bacnet-stack\source;$(SolutionDir)..\submodules\cas-bacnet-stack\submodules\cas-common\source;$(SolutionDir)..\submodules\cas-bacnet-stack\adapters\cpp;%(AdditionalIncludeDirectories);$(SolutionDir)..\submodules\serial</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -169,19 +169,19 @@
   <ItemGroup>
     <ClCompile Include="..\submodules\cas-bacnet-stack\adapters\cpp\CASBACnetStackAdapter.cpp" />
     <ClCompile Include="..\submodules\cas-bacnet-stack\source\MSTP.c" />
+    <ClCompile Include="..\submodules\serial\rs232.c" />
     <ClCompile Include="BACnetServerMSTPExample.cpp" />
     <ClCompile Include="CASBACnetStackExampleDatabase.cpp" />
     <ClCompile Include="CHiTimer.cpp" />
-    <ClCompile Include="Serial.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\submodules\cas-bacnet-stack\adapters\cpp\CASBACnetStackAdapter.h" />
     <ClInclude Include="..\submodules\cas-bacnet-stack\source\MSTP.h" />
+    <ClInclude Include="..\submodules\serial\rs232.h" />
     <ClInclude Include="CASBACnetStackExampleConstants.h" />
     <ClInclude Include="CASBACnetStackExampleDatabase.h" />
     <ClInclude Include="CHiTimer.h" />
     <ClInclude Include="CIBuildVersion.h" />
-    <ClInclude Include="Serial.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

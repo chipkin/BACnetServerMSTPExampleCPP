@@ -54,3 +54,5 @@ bin/
 *.log
 
 BACnetServerMSTPExample/Debug/
+
+.vscode/
