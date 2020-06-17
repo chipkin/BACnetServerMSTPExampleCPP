@@ -5,7 +5,7 @@
    Written by:   Steven Smethust 
    Email:        funvill@funvill.com 
    
-   No warrantee of any kind, express or implied, is included with this
+   No warranty of any kind, express or implied, is included with this
    software; use at your own risk
    
    If you find this code useful, credits would be nice!
@@ -16,7 +16,7 @@
 
  Versions
  1.00aA  25 Nov 02 SWS  Created
- 1.00aB  11 Ded 06 SWS  Added Licence 
+ 1.00aB  11 Ded 06 SWS  Added License 
 
 ********************************************************************************/
 #ifndef __CHiTimer_h__

@@ -1,15 +1,18 @@
-# BACnet Server MSTP Example CPP
+# BACnet Server MSTP Example C++
 
-A minumal BACnet MSTP server example written with C++ using the [CAS BACnet Stack](https://www.bacnetstack.com/). For a full featured BACnet Server example see the [BACnet Server Example CPP](https://github.com/chipkin/BACnetServerExampleCPP) project.
+A minimal BACnet MSTP server example written in C++ using the [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack). For a full featured BACnet Server example see the [BACnet Server Example CPP](https://github.com/chipkin/BACnetServerExampleCPP) project.
 
-Device tree:
+## Releases
 
-- Device: 389999 (Device Rainbow)
-  - analog_value: 2 (AnalogValue Diamond)
+Build versions of this example can be downloaded from the [Releases](https://github.com/chipkin/BACnetServerMSTPExampleCPP/releases) page.
 
-## Cli
+## Installation
 
-The serial port, baud rate, and MAC address of this BACnet MSTP server can be configured using command line parameters.
+Download the latest release zip file on the [Releases](https://github.com/chipkin/BACnetServerMSTPExampleCPP/releases) page.
+
+## Usage
+
+The serial port, baud rate, and MAC address of this BACnet MSTP server can be configured using command line parameters:
 
 ```bash
 BACnetServerMSTPExampleCPP [serial port] [baud rate] [mac address]
@@ -17,9 +20,23 @@ BACnetServerMSTPExampleCPP COM5 9600 1
 BACnetServerMSTPExampleCPP ttyS6 19200 25
 ```
 
-## Output
+Device tree:
 
-The application outputs all BYTES sent or recived. BYTES with underscore after them are recived bytes. BYTES with a space after them are sent bytes. When the user presses the "enter" key, the MSTP stats, states, and events are printed for reference.
+- Device: 389999 (Device Rainbow)
+  - analog_value: 2 (AnalogValue Diamond)
+
+## Build
+
+A [Visual Studio 2019](https://visualstudio.microsoft.com/downloads/) project is included with this project. This project also auto built using [Gitlab CI](https://docs.gitlab.com/ee/ci/) on every commit.
+
+1. Copy *CASBACnetStack_x64_Debug.dll*, *CASBACnetStack_x64_Debug.lib*, *CASBACnetStack_x64_Release.dll*, and *CASBACnetStack_x64_Release.lib* from the [CAS BACnet Stack](https://store.chipkin.com/services/stacks/bacnet-stack) project into the /bin/ folder.
+2. Use [Visual Studio 2019](https://visualstudio.microsoft.com/vs/) to build the project. The solution can be found in the */BACnetServerMSTPExample/* folder.
+
+A makefile that uses gcc is included for making executables on linux.
+
+## Example Output
+
+The application outputs all BYTES sent or received. BYTES with underscore after them are received bytes. BYTES with a space after them are sent bytes. When the user presses the "enter" key, the MSTP stats, states, and events are printed for reference.
 
 ```txt
 CAS BACnet Stack Server MSTP Example v0.0.1.0
@@ -87,15 +104,3 @@ MSTP Events:
              ReceivedPFM:    1      ReceivedReplyToPFM:    1     ResetMaintenancePFM:    2
           RetrySendToken:    0         SendCustomFrame:    1      SendMaintenancePFM:    1
 ```
-
-## Building
-
-A [Visual studio 2019](https://visualstudio.microsoft.com/downloads/) project is included with this project. This project also auto built using [Gitlab CI](https://docs.gitlab.com/ee/ci/) on every commit.
-
-A makefile that uses gcc is included for making excultables on linux.
-
-## Releases
-
-Build versions of this example can be downloaded from the releases page:
-
-[https://github.com/chipkin/BACnetServerMSTPExampleCPP/releases](https://github.com/chipkin/BACnetServerMSTPExampleCPP/releases)

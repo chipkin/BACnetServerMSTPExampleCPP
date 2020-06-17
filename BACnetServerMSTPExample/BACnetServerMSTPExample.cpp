@@ -1,5 +1,17 @@
-// BACnetServerMSTPExample.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+/*
+ * BACnet Server MSTP Example C++
+ * ----------------------------------------------------------------------------
+ * BACnetServerMSTPExample.cpp
+ * 
+ * In this CAS BACnet Stack example, we create a minimal BACnet MSTP server.
+ *
+ * More information https://github.com/chipkin/BACnetServerMSTPExampleCPP
+ * 
+ * This file contains the 'main' function. Program execution begins and ends there.
+ * 
+ * Created by: Steven Smethurst
+*/
+
 
 #include "CASBACnetStackAdapter.h"
 #include "CASBACnetStackExampleConstants.h"
@@ -67,12 +79,13 @@ void APDUCallBack(unsigned char* buffer, uint16_t length, unsigned char source);
 void MSTPFrameCallBack(uint8_t* buffer, uint16_t length); 
 void MSTPDebugLog(const char* message);
 
-// Helper
+// Helper functions
 void DebugMSTPFrame(uint8_t* buffer, uint16_t length);
 
 std::map<std::string, uint32_t> g_statCounter;
 void printMSTPStats(); 
 
+// MSTP Frame
 struct MSTPAPDUFrame : public MSTPFrame
 {
 	MSTPAPDUFrame(uint8_t destination, uint8_t* buffer, uint16_t length) {
@@ -131,8 +144,6 @@ int main(int argc, char* argv[])
 	}
 
 
-
-
 	// 1. Load the CAS BACnet stack functions
 	// ---------------------------------------------------------------------------
 	std::cout << "FYI: Loading CAS BACnet Stack functions... "; 
@@ -142,6 +153,7 @@ int main(int argc, char* argv[])
 	}
 	std::cout << "OK" << std::endl;
 	std::cout << "FYI: CAS BACnet Stack version: " << fpGetAPIMajorVersion() << "." << fpGetAPIMinorVersion() << "." << fpGetAPIPatchVersion() << "." << fpGetAPIBuildVersion() << std::endl;
+
 
 	// 2. Connect the serial resource
 	// ---------------------------------------------------------------------------
@@ -153,7 +165,7 @@ int main(int argc, char* argv[])
 	}
 	std::cout << "OK" << std::endl;
 
-	// Configure the highspeed timer. 
+	// Configure the highspeed timer
 	CHiTimer_Init();
 	
 	// Configure the MSTP thread 
@@ -161,13 +173,16 @@ int main(int argc, char* argv[])
 		std::cerr << "Error: Failed to start MSTP stack" << std::endl;
 		return 0;
 	}
+	
+	// Set the baud rate
 	MSTP_SetBaudRate(g_database.device.baudRate);
 	std::cout << "OK, Connected to port" << std::endl;
 
 	// Set the MSTP stack's max master 
 	MSTP_SetMaxMaster(g_database.device.maxMaster);
 
-	// 3. Setup the callbacks. 
+
+	// 3. Setup the callbacks
 	// ---------------------------------------------------------------------------
 	std::cout << "FYI: Registering the callback Functions with the CAS BACnet Stack" << std::endl;
 
@@ -186,7 +201,8 @@ int main(int argc, char* argv[])
 	// Set Property Callback Functions
 	fpRegisterCallbackSetPropertyReal(CallbackSetPropertyReal);
 
-	// 4. Setup the BACnet device. 
+
+	// 4. Setup the BACnet device 
 	// ---------------------------------------------------------------------------
 	std::cout << "Setting up server device. device.instance=[" << g_database.device.instance << "]" << std::endl; 
 
@@ -195,6 +211,8 @@ int main(int argc, char* argv[])
 		std::cerr << "Failed to add Device." << std::endl;
 		return false;
 	}
+
+	// Add AnalogValue object to device
 	if (!fpAddObject(g_database.device.instance, CASBACnetStackExampleConstants::OBJECT_TYPE_ANALOG_VALUE, g_database.analogValue.instance)) {
 		std::cerr << "Failed to add Analog value(2)." << std::endl;
 		return false;
@@ -202,6 +220,7 @@ int main(int argc, char* argv[])
 	std::cout << "Created Device." << std::endl;
 
 	// Enable services 
+	// Enable write property
 	std::cout << "Enabling WriteProperty service... ";
 	if (!fpSetServiceEnabled(g_database.device.instance, CASBACnetStackExampleConstants::SERVICE_WRITE_PROPERTY, true)) {
 		std::cerr << "Failed to enabled the WriteProperty" << std::endl;
@@ -223,11 +242,13 @@ int main(int argc, char* argv[])
 	std::cout << "FYI: Sending I-AM broadcast" << std::endl;
 	uint8_t connectionString[1] = { 0xFF };
 	if (!fpSendIAm(g_database.device.instance, connectionString, 1, CASBACnetStackExampleConstants::NETWORK_TYPE_MSTP, true, 65535, NULL, 0)) {
-		std::cerr << "Unable to send IAm broadcast" << std::endl ; 
+		std::cerr << "Unable to send I-Am broadcast" << std::endl; 
 		return false;
 	}
 
+	// Clear the RX TX Buffer
 	RS232_flushRXTX(g_database.device.serialPort);
+
 
 	// 5. Start the main loop
 	// ---------------------------------------------------------------------------
@@ -266,12 +287,12 @@ uint16_t CallbackReceiveMessage(uint8_t* message, const uint16_t maxMessageLengt
 	if (g_incomingFrame.size() <= 0) {
 		// Call Sleep to give some time back to the system
 		Sleep(1);
-		return 0; // Nothing recived. 
+		return 0; // Nothing received
 	}
 
 	for (std::list<MSTPAPDUFrame>::iterator itr = g_incomingFrame.begin(); itr != g_incomingFrame.end(); itr++) {
 		if ((*itr).length > maxMessageLength) {
-			// This is too big to fit in the message buffer. it probably never will be able to be used. lets get ride of it 
+			// This is too big to fit in the message buffer. It probably never will be able to be used, so get rid of it.
 			g_incomingFrame.erase(itr);
 			return 0;
 		}
@@ -541,8 +562,8 @@ bool SendByte(unsigned char* byte, uint16_t length) {
 }
 
 // The MSTP thread does not need attention for the next "length" amount of time. 
-// This function can do nothing, and the MSTP thread will consumed as much proccessing power 
-// that you will give it. 
+// This function can do nothing, and the MSTP thread will consume as much processing power 
+// as you give it.
 void ThreadSleep(uint32_t length) {
 	if (length < 1) {
 		return;
@@ -555,7 +576,7 @@ void TimerReset() {
 	CHiTimer_Reset();
 }
 
-// Find the differen in time between the last time that the TimerReset was called and now. 
+// Find the difference in time between the last time that the TimerReset was called and now. 
 uint32_t TimerDifference() {
 	return CHiTimer_DiffTimeMicroSeconds();
 }
@@ -573,6 +594,7 @@ void MSTPDebugLog(const char* message) {
 	#endif // MSTP_DEBUG
 }
 
+// Displays MSTP Frame Data
 void DebugMSTPFrame(uint8_t* buffer, uint16_t length) {
 	if (length < 3) {
 		return;
