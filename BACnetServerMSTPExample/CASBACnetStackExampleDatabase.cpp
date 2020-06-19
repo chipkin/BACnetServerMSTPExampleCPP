@@ -1,3 +1,13 @@
+/*
+ * BACnet Server MSTP Example C++
+ * ----------------------------------------------------------------------------
+ * CASBACnetStackExampleDatabase.cpp
+ * 
+ * Sets up object names and properties in the database.
+ * 
+ * Created by: Steven Smethurst
+*/
+
 #include "CASBACnetStackExampleDatabase.h"
 
 #include <time.h> // time()
