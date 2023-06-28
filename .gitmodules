@@ -1,3 +1,6 @@
 [submodule "submodules/serial"]
 	path = submodules/serial
 	url = https://gitlab.com/Teuniz/RS-232.git
+[submodule "submodules/cas-bacnet-stack"]
+	path = submodules/cas-bacnet-stack
+	url = https://gitlab.com/chipkin/cas-bacnet-stack.git
