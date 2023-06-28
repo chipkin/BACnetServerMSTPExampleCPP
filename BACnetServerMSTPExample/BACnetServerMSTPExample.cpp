@@ -66,16 +66,16 @@ ExampleDatabase g_database; // The example database that stores current values.
 
 // Constants
 // =======================================
-const std::string APPLICATION_VERSION = "0.0.2";  // See CHANGELOG.md for a full list of changes.
+const std::string APPLICATION_VERSION = "0.0.3";  // See CHANGELOG.md for a full list of changes.
 const uint32_t MAX_XML_RENDER_BUFFER_LENGTH = 1024 * 20;
 
 // MSTP callbacks 
-bool RecvByte(unsigned char* byte);
-bool SendByte(unsigned char* byte, uint16_t length);
+bool RecvByte(uint8_t* byte);
+bool SendByte(uint8_t* byte, uint16_t length);
 void ThreadSleep(uint32_t length);
 void TimerReset();
 uint32_t TimerDifference();
-void APDUCallBack(unsigned char* buffer, uint16_t length, unsigned char source);
+void APDUCallBack(uint8_t* buffer, uint16_t length, uint8_t source);
 void MSTPFrameCallBack(uint8_t* buffer, uint16_t length); 
 void MSTPDebugLog(const char* message);
 
@@ -116,7 +116,7 @@ bool CallbackGetPropertyUInt(const uint32_t deviceInstance, const uint16_t objec
 bool CallbackGetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, float* value, const bool useArrayIndex, const uint32_t propertyArrayIndex);
 
 // Set Property Functions
-bool CallbackSetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, const float value, const bool useArrayIndex, const uint32_t propertyArrayIndex, const uint8_t priority, unsigned int* errorCode);
+bool CallbackSetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, const float value, const bool useArrayIndex, const uint32_t propertyArrayIndex, const uint8_t priority, uint32_t* errorCode);
 
 int main(int argc, char* argv[])
 {
@@ -416,7 +416,7 @@ bool CallbackGetPropertyReal(const uint32_t deviceInstance, const uint16_t objec
 	return false;
 }
 
-bool CallbackSetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, const float value, const bool , const uint32_t , const uint8_t , unsigned int* ) {
+bool CallbackSetPropertyReal(const uint32_t deviceInstance, const uint16_t objectType, const uint32_t objectInstance, const uint32_t propertyIdentifier, const float value, const bool , const uint32_t , const uint8_t , uint32_t* ) {
 	if (deviceInstance != g_database.device.instance) {
 		return false; // Not this device.
 	}
@@ -523,7 +523,7 @@ void printMSTPStats() {
 // Return 
 //   True - Found a byte and stored the value in byte prameter. 
 //   False - No bytes avaliable. 
-bool RecvByte(unsigned char* byte) {
+bool RecvByte(uint8_t* byte) {
 	if (RS232_PollComport(g_database.device.serialPort, byte, 1) <= 0) {
 		// no bytes found 
 		return false;
@@ -542,7 +542,7 @@ bool RecvByte(unsigned char* byte) {
 // Return
 //   True  - The bytes where succesfuly sent. 
 //   False - Could not send the bytes. Try again later. 
-bool SendByte(unsigned char* byte, uint16_t length) {
+bool SendByte(uint8_t* byte, uint16_t length) {
 
 #ifdef MSTP_DEBUG
 	// Debug print
@@ -583,7 +583,7 @@ uint32_t TimerDifference() {
 
 // When ever the MSTP stack recives a APDU message it will pass it up to this function for processing 
 // by the BACnet API stack. 
-void APDUCallBack(unsigned char* buffer, uint16_t length, unsigned char source) {
+void APDUCallBack(uint8_t* buffer, uint16_t length, uint8_t source) {
 	g_incomingFrame.push_back(MSTPAPDUFrame(source, buffer, length));
 }
 
