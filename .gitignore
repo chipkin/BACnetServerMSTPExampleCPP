@@ -56,3 +56,5 @@ bin/
 BACnetServerMSTPExample/Debug/
 
 .vscode/
+
+BACnetServerMSTPExample/x64/Debug/

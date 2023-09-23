@@ -66,7 +66,7 @@ ExampleDatabase g_database; // The example database that stores current values.
 
 // Constants
 // =======================================
-const std::string APPLICATION_VERSION = "0.0.3";  // See CHANGELOG.md for a full list of changes.
+const std::string APPLICATION_VERSION = "0.0.4";  // See CHANGELOG.md for a full list of changes.
 const uint32_t MAX_XML_RENDER_BUFFER_LENGTH = 1024 * 20;
 
 // MSTP callbacks 
@@ -127,12 +127,12 @@ int main(int argc, char* argv[])
 
 	// Check the command line arguments 
 	if (argc >= 2) {
-		int32_t port = RS232_GetPortnr(argv[1]);
-		if (port < 0) {
+		int32_t portNr = RS232_GetPortnr(argv[1]);
+		if (portNr < 0) {
 			std::cerr << "Could not detect port number from string. port=[" << argv[2] << "]... Accepted string COM4, ttyS4, etc... " << std::endl;
 			return 0; 
 		}
-		g_database.device.serialPort = (uint8_t)port; 
+		g_database.device.serialPort = (uint8_t)portNr;
 		std::cout << "FYI: Using comport=[" << argv[1] << "], Portnr=[" << (int) g_database.device.serialPort << "]" << std::endl ;
 	}
 	if (argc >= 3) {
@@ -142,7 +142,6 @@ int main(int argc, char* argv[])
 		g_database.device.macAddress = (uint8_t)atoi(argv[3]);
 		std::cout << "FYI: Using macAddress=[" << (int) g_database.device.macAddress << "]" << std::endl;
 	}
-
 
 	// 1. Load the CAS BACnet stack functions
 	// ---------------------------------------------------------------------------
@@ -157,26 +156,31 @@ int main(int argc, char* argv[])
 
 	// 2. Connect the serial resource
 	// ---------------------------------------------------------------------------
-	std::cout << "FYI: Connecting serial resource to serial port. baudrate=[" << g_database.device.baudRate << "], ... ";
-
+	std::cout << "FYI: Connecting serial resource to serial port. serialPort.portNr=[" << (int) g_database.device.serialPort << "], baudrate = [" << g_database.device.baudRate << "], ... ";
 	if (RS232_OpenComport(g_database.device.serialPort, g_database.device.baudRate, "8N1", 0) == 1) {
 		std::cerr << "Error: Failed to open serial port" << std::endl;
 		return 0;
 	}
-	std::cout << "OK" << std::endl;
+	else {
+		std::cout << "OK" << std::endl;
+	}
+
 
 	// Configure the highspeed timer
 	CHiTimer_Init();
 	
 	// Configure the MSTP thread 
+	std::cout << "FYI: Connecting MSTP stack. macAddress=[" << (int)g_database.device.macAddress << "], maxMaster["<< (int)g_database.device.maxMaster << "]...";
 	if (!MSTP_Init(RecvByte, SendByte, ThreadSleep, APDUCallBack, TimerReset, TimerDifference, g_database.device.macAddress, MSTPFrameCallBack, MSTPDebugLog)) {
 		std::cerr << "Error: Failed to start MSTP stack" << std::endl;
 		return 0;
 	}
+	else {
+		std::cout << "OK" << std::endl;
+	}
 	
 	// Set the baud rate
 	MSTP_SetBaudRate(g_database.device.baudRate);
-	std::cout << "OK, Connected to port" << std::endl;
 
 	// Set the MSTP stack's max master 
 	MSTP_SetMaxMaster(g_database.device.maxMaster);
@@ -492,7 +496,7 @@ void printMSTPStats() {
 
 	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "Previous Station (AS):" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.AS;
 	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "RetryCount:" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (int)mstp_runningVariables.RetryCount;
-	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "SilenceTimerMS:" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (uint32_t)mstp_runningVariables.SilenceTimerMicroSeconds;
+	std::cout << std::setw(PARAMETER_NAME_WIDTH) << std::setfill(' ') << "SilenceTimer (MS):" << std::dec << std::setw(PARAMETER_VALUE_WIDTH) << (uint32_t)mstp_runningVariables.SilenceTimerMicroSeconds /1000;
 	std::cout << std::endl;	
 	std::cout << std::endl;
 
@@ -528,13 +532,11 @@ bool RecvByte(uint8_t* byte) {
 		// no bytes found 
 		return false;
 	}
-
 #ifdef MSTP_DEBUG
 	// Found a byte. 
 	std::cout << std::hex << std::setw(2) << std::setfill('0') << (int) *byte ;
 	std::cout << "_";	
 #endif // MSTP_DEBUG
-
 	return true;
 }
 
@@ -550,8 +552,6 @@ bool SendByte(uint8_t* byte, uint16_t length) {
 		std::cout << std::hex << std::setw(2) << std::setfill('0') << (int) byte[offset];
 		std::cout << " "; 
 	}
-	DebugMSTPFrame(byte, length);
-	std::cout << std::endl; 	
 #endif // MSTP_DEBUG
 
 	if (RS232_SendBuf(g_database.device.serialPort, byte, length) != length) {
@@ -577,6 +577,10 @@ void TimerReset() {
 }
 
 // Find the difference in time between the last time that the TimerReset was called and now. 
+// 
+// Note: For debugging, if you have two devices that count time slower in the same way 
+//       (Example "CHiTimer_DiffTimeMicroSeconds() / 10" ) then you can watch the MSTP state 
+//       machine in real time.
 uint32_t TimerDifference() {
 	return CHiTimer_DiffTimeMicroSeconds();
 }
@@ -632,7 +636,6 @@ void DebugMSTPFrame(uint8_t* buffer, uint16_t length) {
 }
 
 void MSTPFrameCallBack(uint8_t* buffer, uint16_t length) {
-
 	#ifdef MSTP_DEBUG
 		DebugMSTPFrame(buffer, length);
 		std::cout << std::endl;
