@@ -2,6 +2,11 @@
 
 ## Version 0.0.x
 
+### 0.0.4 (2023-Sep-22)
+
+- Updated the CAS BACnet Stack to version 4.1.19
+- Updated the CAS BACnet Stack MSTP stack 4
+
 ### 0.0.3 (2023-Jun-28)
 
 - Updated the application function definition for CallbackSetPropertyReal to match the CAS BACnet Stack on non 32bit systems
